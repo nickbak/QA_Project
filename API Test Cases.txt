@@ -1,0 +1,142 @@
+Brief
+
+API Project
+A coach logs into the Hudl.com web app and wants to access a schedule page that contains a list of opponent information, including dates and times of each game. The schedule page user interface (UI) layer calls a service, which calls a database to access the proper team and schedule data to display. You will not have access to a Hudl.com account for this exercise. We’re looking for the ability to think critically about how the UI interacts with a service API to correctly view, update, create, and remove schedule entries using the “Test Driven Development” process. Feel free to use a blank text document for this exercise. A great API testing project will:
+ 
+•	Include a set of detailed test cases for each step of the workflow. Each case should explain the behavior between what the coach might see and how the data is being retrieved from a backend service. 
+•	Clearly define expected request parameters and response codes for each HTTP method based on valid and invalid inputs.
+•	Describe negative testing considerations, failure scenarios, or breaking points for each step of the following workflow.
+ 
+Using the following data object for a team’s schedule entry, create test cases for each of these HTTP methods.
+ 
+GET: On success, viewing a list of schedule entries returns a 200 OK status code
+PUT: On success, updating a single schedule entry returns a 200 OK status code
+POST: On success, creating a new schedule entry returns a 200 OK status code
+DELETE: On success, removing a schedule entry returns a 204 status code with no data object.
+ 
+{
+gameId: "1234567",
+sqlId: "1234567",
+date: "2016-01-01T19:00:00",
+opponent: "TestOpponent",
+opponentId: "123456",
+isHome: true,
+gameType: 0,
+categories: [ ]
+}
+ 
+Here are some example HTTP response codes that could be used for the above workflow:
+ 
+•	500 - Internal Server Error
+•	200 - OK
+•	403 - Forbidden
+•	404 - Not Found
+•	401 - Unauthorized
+
+
+API Test Plan
+
+Assumptions
+- Coaches only have one team
+- API takes the Coach ID or a token identify them as a parameter
+- Login workflow is outside the scope of this document
+
+API Spec
+
+Endpoint	HTTP Method	Result
+games		GET		Get all the games
+games		POST		Add a game to the team's schedule
+games/{gameId}	PUT		Update a single game
+games/{gameId}	DELETE		Delete a single game
+
+
+Workflow
+
+As a coach I want to see the schedule of upcoming games so I can plan 
+=====================================================================
+
+Test cases
+
+Show all games for a given coach 
+
+COACH: Browses to a schedule page for his team on HUDL
+UI: Identifies Coach, adds header coachid, calls:
+
+API Server: retrieves list of games that match the coachID with a 200 error
+
+METHOD		CoachID		Test Data		Body		Status Code
+
+GET /games	VALID		10 games in DB		Array of games	200
+GET /games	INVALID		N/A			Empty		401
+GET /games	VALID		0 games in DB		Empty Array	200
+Get /games	VALID		DB unavailable		Empty		503 (Service Unavailable)
+
+Testing Considerations
+Future games only? if so TimeZones are involved and need testing
+Is there a maximum number of games per team, paging may be needed if this is uncapped
+What are the SLAs for time to return results
+Concurrency: Can mulitple coaches see the results for a single team?
+
+As a coach I want to edit the kick off time of the next game
+=====================================================================
+
+UI: Provides an "Edit Game" button next to each game in the schedule, clicking this takes them to an editable view of a game
+COACH: Updates kick off time and clicks save
+
+METHOD			CoachID		gameId			Body			Status Code
+
+PUT /games/{gameId}	VALID		Belongs to the team	game with new date	200
+PUT /games/{gameId}	INVALID		Belongs to the team	Empty			401
+PUT /games/{gameId}	VALID		Other teams game Id	game with new date	403
+PUT /games/{gameId}	VALID		INVALID			game with new date	404
+
+Testing Considerations
+Concurrency: Did some else edit this between you reading and writing the record. 
+DateTime Validation: Are there business rules around allowable time, dates in the past etc
+Timezone issues need careful testing
+Does this change notify or have an effect on the opponents view of this game
+Auditing change: Is this a requirement? Do we need to see a history of this game
+
+As a coach I want to Add a new game to the team schedule
+=====================================================================
+
+UI: Provides a "New Game" button and form to complete the information needed
+COACH: Clicks New Game, adds information and clicks save
+
+METHOD		CoachID		Request Body		Response Body	Status Code
+
+POST /games	VALID		game with new date	created game	200
+POST /games	INVALID		Empty			Empty		401
+POST /games	VALID		INVALID			Empty		400
+
+Testing Considerations
+Similar to Update above
+
+DateTime Validation: Are there business rules around allowable time, dates in the past etc
+Timezone issues need careful testing
+Does this change notify or have an effect on the opponents view of this game
+Auditing change: Is this a requirement? Do we need to see a history of this game
+
+Data in game request body would need a lot of coverage and fuzz/property testing as well functional coverage
+
+As a coach I want to Delete a game from the team schedule
+=====================================================================
+
+UI: Provides a "Delete Game" button next to each game in the schedule
+COACH: Clicks Delete Game, Prompted "Are you sure" then clicks Yes
+
+METHOD			CoachID		gameId			Status Code
+
+DELETE /games/{gameId}	VALID		Belongs to the team	204
+DELETE /games/{gameId}	VALID		INVALID			404
+DELETE /games/{gameId}	INVALID		Belongs to the team	401
+DELETE /games/{gameId}	VALID		Other teams game Id	403
+
+
+Testing Considerations
+
+Does this change notify or have an effect on the opponents view of this game
+Auditing change: Is this a requirement? Do we need to see a history of this game
+
+
+
